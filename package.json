@@ -1,10 +1,10 @@
 {
   "name": "@automatelab/n8n-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Cursor with three n8n tools: scaffold node, generate workflow, lint workflow.",
   "type": "module",
   "bin": {
-    "n8n-mcp": "./dist/index.js"
+    "n8n-mcp": "dist/index.js"
   },
   "main": "./dist/index.js",
   "scripts": {
