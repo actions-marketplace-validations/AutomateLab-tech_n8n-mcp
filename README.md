@@ -1,6 +1,6 @@
 # n8n-mcp
 
-An [MCP](https://modelcontextprotocol.io) server that gives [Cursor](https://cursor.sh) three tools for working with [n8n](https://n8n.io): scaffold a custom node, generate a workflow JSON from a description, and lint an existing workflow. Background and design notes are in the [long-form post on automatelab.tech](https://automatelab.tech).
+An [MCP](https://modelcontextprotocol.io) server that gives [Cursor](https://cursor.sh) three tools for working with [n8n](https://n8n.io): scaffold a custom node, generate a workflow JSON from a description, and lint an existing workflow.
 
 ## TL;DR
 
@@ -94,10 +94,6 @@ npm run smoke
 ```
 
 `npm run smoke` boots the server with a `--smoke` flag that lists registered tools and exits without binding stdio. Useful for CI or first-run sanity checks.
-
-## More
-
-Build notes, design tradeoffs, and the n8n cluster on automatelab: [https://automatelab.tech](https://automatelab.tech).
 
 ## License
 

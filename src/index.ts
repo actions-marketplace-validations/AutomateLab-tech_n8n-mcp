@@ -42,7 +42,7 @@ const tools = [
 const server = new Server(
 	{
 		name: "n8n-mcp",
-		version: "0.1.0",
+		version: "0.1.1",
 	},
 	{
 		capabilities: { tools: {} },
@@ -69,7 +69,7 @@ async function main() {
 	if (process.argv.includes("--smoke")) {
 		const summary = {
 			server: "n8n-mcp",
-			version: "0.1.0",
+			version: "0.1.1",
 			tools: tools.map((t) => t.name),
 		};
 		process.stdout.write(JSON.stringify(summary, null, 2) + "\n");
