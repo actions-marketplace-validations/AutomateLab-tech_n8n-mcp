@@ -1,8 +1,8 @@
 {
   "name": "@automatelab/n8n-mcp",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "mcpName": "io.github.ratamaha-git/n8n-mcp",
-  "description": "MCP server for Cursor with three n8n tools: scaffold node, generate workflow, lint workflow.",
+  "description": "MCP server for n8n: generate workflows, lint, explain failed executions, and drive a live n8n instance via REST.",
   "type": "module",
   "bin": {
     "n8n-mcp": "dist/index.js"
@@ -18,8 +18,12 @@
     "n8n",
     "mcp",
     "cursor",
+    "claude",
+    "agent-skill",
     "model-context-protocol",
-    "workflow-automation"
+    "workflow-automation",
+    "langchain",
+    "ai-agent"
   ],
   "homepage": "https://github.com/ratamaha-git/n8n-mcp",
   "repository": {
@@ -37,6 +41,8 @@
   "files": [
     "dist/",
     "examples/",
+    "references/",
+    "SKILL.md",
     "README.md",
     "LICENSE"
   ],

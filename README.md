@@ -1,18 +1,49 @@
 # n8n-mcp
 
-An [MCP](https://modelcontextprotocol.io) server that gives [Cursor](https://cursor.sh) three tools for working with [n8n](https://n8n.io): scaffold a custom node, generate a workflow JSON from a description, and lint an existing workflow.
+An [MCP](https://modelcontextprotocol.io) server that gives Claude, Cursor, and other MCP-compatible agents nine tools for working with [n8n](https://n8n.io): scaffold a custom node, generate workflow JSON, lint, **diagnose failed executions**, and drive a live n8n instance via REST.
 
-## TL;DR
+[![npm](https://img.shields.io/npm/v/@automatelab/n8n-mcp.svg)](https://www.npmjs.com/package/@automatelab/n8n-mcp)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-Install once, paste four lines into `~/.cursor/mcp.json`, and Cursor can scaffold n8n nodes, generate workflow JSON, and catch deprecated node types in your workflows.
+## Why we built this
 
-## What it does
+We use n8n daily inside [AutomateLab](https://automatelab.tech), and we kept hitting the same friction when asking an LLM to help: it would emit workflow JSON that imported but failed at runtime, or it would generate AI Agent clusters with the wrong connection types, or - most frustrating - the user would paste an execution that "silently dropped items" and the model had no idea where to look. Generic "give the model the whole n8n catalog" approaches eat huge context and still produce broken JSON because the failure modes are subtle (typeVersion mismatches, IF v1 schema, credential references that don't survive import).
 
-Three tools, exposed over MCP stdio transport:
+So we built a small, focused server: **encode the failure modes the lint can catch, the cluster topology the generator must respect, and the diagnosis the agent can't do alone.**
 
-- **`n8n_scaffold_node`** - takes a one-line description and returns a TypeScript skeleton for an `INodeType`: `description` block, credential reference, `execute` method stub returning `INodeExecutionData[][]`.
-- **`n8n_generate_workflow`** - takes a description like "Stripe webhook to Slack and Google Sheets" and returns valid n8n workflow JSON: unique node `id`s, correct `connections`, `position` arrays, `typeVersion` on every node.
-- **`n8n_lint_workflow`** - takes a workflow JSON and returns concrete validation errors: missing credentials, deprecated node names (`Function` -> `Code`), broken connections, missing `typeVersion`.
+## Why it's different
+
+Other n8n MCP servers (notably [czlonkowski/n8n-mcp](https://github.com/czlonkowski/n8n-mcp)) compete on breadth - 20+ tools and an indexed corpus of every n8n node. They own that niche.
+
+This server is the **debugging-and-first-run-correctness MCP for n8n**:
+
+- **`n8n_explain_execution`** is the wedge. Paste the execution JSON; get back per-node findings: which nodes returned 0 items, which had unresolved `={{ ... }}` expressions, error messages with concrete hints. No other MCP server does this well, and it hits the n8n community's #1 debugging pain point (silent data loss between nodes).
+- **`n8n_generate_workflow`** is opinionated about AI Agent topology - emits proper LangChain clusters with `ai_languageModel` / `ai_memory` / `ai_tool` connections (sub-nodes connect *upward* to the agent, not via `main`). Imports cleanly on n8n 1.x.
+- **`n8n_lint_workflow`** catches the silent failures: deprecated node types (Function → Code, spreadsheetFile → convertToFile), AI Agent missing language model, IF v1 schema, Webhook missing webhookId, broken connections across all connection types (not just `main`).
+- **5 REST tools** (gated on `N8N_API_URL` + `N8N_API_KEY`) let you list, fetch, create, activate workflows and pull executions - so the lint and explain tools can run against your live workflows, not just JSON pasted in chat.
+
+Plus: a paired [Agent Skill](./SKILL.md) that teaches the model when to use which tool and where to load deeper context (split into `references/` so it doesn't bloat the prompt).
+
+## Tools
+
+**Stateless** (work without a live n8n instance):
+
+| Tool | Purpose |
+|---|---|
+| `n8n_generate_workflow` | Plain-English description → workflow JSON. Detects AI-agent intent. |
+| `n8n_scaffold_node` | Description → single `INodeType` TypeScript file for a custom n8n package. |
+| `n8n_lint_workflow` | Workflow JSON → list of errors and warnings. |
+| `n8n_explain_execution` | Failed execution JSON → per-node diagnosis with hints. |
+
+**Live-instance** (require `N8N_API_URL` + `N8N_API_KEY` env vars):
+
+| Tool | Purpose |
+|---|---|
+| `n8n_list_workflows` | Paginate workflows; filter by active/tags/name. |
+| `n8n_get_workflow` | Fetch a workflow by id. |
+| `n8n_create_workflow` | POST a workflow. Strips read-only fields. |
+| `n8n_activate_workflow` | Flip active on/off. |
+| `n8n_list_executions` | Browse executions; pass `includeData: true` for the full body. |
 
 ## Install
 
@@ -22,53 +53,59 @@ Requires Node 20 or later.
 npm install -g @automatelab/n8n-mcp
 ```
 
-## Configure Cursor
+## Configure your MCP host
 
-Add this block to `~/.cursor/mcp.json`:
+**Cursor** (`~/.cursor/mcp.json`) or **Claude Desktop** (`claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "n8n": {
       "command": "npx",
-      "args": ["-y", "@automatelab/n8n-mcp"]
+      "args": ["-y", "@automatelab/n8n-mcp"],
+      "env": {
+        "N8N_API_URL": "https://your-n8n.example.com",
+        "N8N_API_KEY": "n8n_..."
+      }
     }
   }
 }
 ```
 
-Restart Cursor. The three `n8n_*` tools appear in the MCP panel.
+The `env` block is optional - the 4 stateless tools work without it. Get an API key from n8n: **Settings → API → Create API key**.
+
+Restart your MCP host. The 9 `n8n_*` tools appear in the MCP panel.
 
 ## Tool examples
 
-### `n8n_scaffold_node`
-
-Prompt in Cursor:
-
-> Use n8n_scaffold_node to scaffold a node that posts a message to Discord with rate limiting.
-
-Returns a complete `discordRateLimited.node.ts` ready to drop into a custom n8n package.
-
 ### `n8n_generate_workflow`
 
-Prompt in Cursor:
+> Use n8n_generate_workflow to build: Stripe webhook → Slack message + new row in Google Sheets.
 
-> Use n8n_generate_workflow to build: Stripe webhook -> Slack message + new row in Google Sheets.
+Returns workflow JSON ready for n8n's "Import from File" dialog.
 
-Returns a workflow JSON you can paste straight into n8n's import dialog.
+### `n8n_explain_execution`
+
+> Here's a failed execution from n8n. Why is the Slack node not firing?
+> [paste JSON]
+
+Returns:
+```
+WARNING [Filter] Returned 0 items. Downstream nodes will not execute.
+  hint: Common causes: (1) IF/Switch routed to the other branch — check `parameters.conditions`. (2) Filter/Set node dropped everything — inspect its output explicitly.
+
+INFO [Last node executed was "Filter". If the workflow stopped here unexpectedly, check its output items below.]
+```
 
 ### `n8n_lint_workflow`
-
-Prompt in Cursor:
 
 > Lint this workflow JSON.
 > [paste JSON]
 
-Returns a list like:
-
+Returns:
 ```
-ERROR [Webhook] Missing `typeVersion`.
-WARNING [Slack] Node type "n8n-nodes-base.slack" usually needs a credential. None set.
+ERROR [AI Agent] AI Agent has no `ai_languageModel` sub-node connected. Attach a chat model (e.g. lmChatOpenAi).
+WARNING [Webhook] Webhook node has no `webhookId`. n8n auto-generates one on import, so the production URL will change.
 WARNING [LegacyFunction] Node type "n8n-nodes-base.function" is deprecated. Use "n8n-nodes-base.code".
 ```
 
@@ -81,7 +118,7 @@ The `examples/` directory ships with two ready-to-import workflows:
 - `workflow-stripe-to-slack.json` - Stripe webhook fans out to Slack and Google Sheets.
 - `workflow-rss-to-discord.json` - RSS feed trigger posts new items to a Discord channel.
 
-Import either via n8n's "Import from File" dialog.
+Import either via n8n's **Import from File** dialog.
 
 ## Development
 

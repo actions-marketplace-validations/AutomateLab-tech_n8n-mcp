@@ -1,144 +1,88 @@
 ---
 name: n8n
-description: Use when the user wants to build, debug, or extend an n8n workflow - generating workflow JSON from a description, scaffolding a custom TypeScript node, building an AI agent (LangChain cluster), iterating over items, writing Code-node JS, or linting an existing workflow for missing credentials, deprecated node types, broken connections, and bad return shapes.
+description: Use when the user wants to build, debug, or extend an n8n workflow - generating workflow JSON from a description, scaffolding a custom TypeScript node, building an AI agent (LangChain cluster), iterating over items, writing Code-node JS, linting an existing workflow, diagnosing a failed execution, or driving a live n8n instance via REST.
+version: 0.3.0
+license: MIT
+homepage: https://github.com/ratamaha-git/n8n-mcp
+compatibility:
+  hosts:
+    - claude-code
+    - cursor
+    - claude-desktop
+metadata:
+  npm: "@automatelab/n8n-mcp"
+  mcpName: io.github.ratamaha-git/n8n-mcp
 ---
 
 # n8n
 
-This skill pairs with the `@automatelab/n8n-mcp` server. It gives you three tools and the n8n-specific context you need to produce output that imports cleanly and runs on the first try.
+Pairs with the `@automatelab/n8n-mcp` server. The server exposes 9 MCP tools; this skill tells you when to use which and where to load deeper context.
 
-## When to use which tool
+## Tool routing
 
-- **`n8n_generate_workflow`** - the user describes a flow in plain English ("Stripe webhook to Slack and a Google Sheets row"). Returns workflow JSON ready for n8n's "Import from File" dialog.
-- **`n8n_scaffold_node`** - the user wants a *custom* node (one not in n8n's library, or a thin wrapper around an internal API). Returns a single `INodeType` TypeScript file.
-- **`n8n_lint_workflow`** - the user pastes existing workflow JSON, OR you just generated one. Catches missing `typeVersion`, deprecated types, missing credentials, broken connections, duplicate IDs.
+**Stateless tools** (work without any n8n instance):
 
-Default chain: `generate_workflow` -> `lint_workflow` on the result. Hand back the JSON only if lint reports no issues, or call out the warnings explicitly.
+- `n8n_generate_workflow` - plain-English description → workflow JSON. Detects AI-agent intent and emits a LangChain cluster.
+- `n8n_scaffold_node` - description → single `INodeType` TypeScript file for a custom n8n package.
+- `n8n_lint_workflow` - workflow JSON → list of issues (deprecated types, missing `typeVersion`, broken connections, AI Agent without `ai_languageModel`, IF v1 schema, etc.).
+- `n8n_explain_execution` - failed/surprising execution JSON → diagnosis. Catches the #1 n8n pain point: items "silently disappearing" between nodes. Also flags unresolved `={{ ... }}` expressions and surfaces LLM token usage.
 
-## The n8n data model: items and auto-iteration
+**Live-instance tools** (require `N8N_API_URL` + `N8N_API_KEY` env vars):
 
-This is the single biggest source of broken workflows. Every node sees an array:
+- `n8n_list_workflows` - paginate workflows; filter by active/tags/name.
+- `n8n_get_workflow` - fetch a workflow by id. Pair with `n8n_lint_workflow` to audit deployed workflows.
+- `n8n_create_workflow` - POST a generated workflow. Strips read-only fields. Workflow is created inactive.
+- `n8n_activate_workflow` - flip active on/off.
+- `n8n_list_executions` - browse executions; pass `includeData: true` for the full body. Pair with `n8n_explain_execution`.
 
-```
-[ { json: { ... }, binary?: { ... } }, { json: { ... } }, ... ]
-```
+Default chains:
+- *Generate, then ship*: `generate_workflow` → `lint_workflow` → (if env configured) `create_workflow` → `activate_workflow`.
+- *Audit a deployed workflow*: `list_workflows` → `get_workflow` → `lint_workflow`.
+- *Diagnose a failure*: `list_executions {status: "error"}` → pick one → `list_executions {includeData: true, ...}` → `explain_execution`.
 
-Most nodes **auto-iterate**: they run once *per item*. You almost never need an explicit loop. If a previous node returned 10 items, the next node executes 10 times automatically.
+## When the user describes a flow
 
-Expression cheat sheet (use inside `={{ ... }}`):
+1. Run `n8n_generate_workflow` with their description verbatim.
+2. Run `n8n_lint_workflow` on the result.
+3. If lint clean → return the JSON. If warnings → return JSON + a one-line summary of warnings. If errors → fix them (usually by editing the JSON inline or re-prompting the user) before returning.
 
-- `$json` - the *current* item's `json` payload (most common)
-- `$json.field.nested` - dot-walk into the current item
-- `$input.all()` - full array of items entering this node
-- `$input.first()` / `$input.last()` - shortcuts
-- `$("Node Name").item.json` - the matching item from another node (paired by run index)
-- `$("Node Name").all()` - all items from another node, regardless of pairing
-- `$("Node Name").first().json` - first item from another node
-- `$node["Node Name"].json` - legacy syntax, still works but `$()` is preferred
+## When the user pastes execution data and says "why is X empty?"
 
-Common mistake: writing `$json[0]` because you saw a JSON array in the input panel. The array IS the item list - n8n already split it. Use `$json` (singular) and trust auto-iteration.
+1. Run `n8n_explain_execution` with the JSON.
+2. Read the findings; if the answer is in the report (e.g. "Node Y returned 0 items because IF condition routed to other branch"), summarize. Otherwise inspect the workflow node's `parameters` block manually.
 
-## Iteration: do you actually need a loop?
+## Loading deeper context
 
-Decision tree:
+The skill stays small to keep your context window free. Load from `references/` only when the task actually needs that depth:
 
-1. **Default: no loop.** Drop a Set / HTTP Request / Code node after your data source and it'll run per item.
-2. **Need a loop only for:**
-   - Paged API calls (loop while `nextCursor` is set)
-   - Rate-limited APIs that need batching with delay
-   - Sequential side-effects where order matters and you must process N at a time
-3. **Picking the right node:**
-   - **Split Out** - one item contains an array field (e.g. `items[]`); flatten so each array element becomes its own item. Use this 90% of the time you "need to iterate over an array."
-   - **Loop Over Items (Split In Batches)** - actual loop with a configurable batch size and a back-edge connection. Use for pagination and rate-limited batching.
-   - **Aggregate** - inverse of Split Out: collapse N items back into a single item with an array field.
+- `references/expressions.md` - `$json`, `$input.all()`, `$("Node Name")`, auto-iteration. **Load when**: writing or debugging expressions, or the user says "use `$json[0]`" (common mistake).
+- `references/ai-agents.md` - LangChain cluster topology, `ai_languageModel` / `ai_memory` / `ai_tool` connection types, sub-node catalog. **Load when**: building an AI agent or the lint flags an agent without a language model.
+- `references/code-node.md` - Code node return-shape contract, what breaks, sandbox limits. **Load when**: writing a Code node or the user reports "Code node fails silently."
+- `references/workflow-json.md` - `nodes`/`connections` structure, required fields, credential block. **Load when**: hand-editing workflow JSON or merging two workflows.
+- `references/iteration.md` - Split Out vs Loop Over Items vs Aggregate. **Load when**: the user says "loop over an array" or "process N at a time."
+- `references/deprecations.md` - retired node types and their replacements. **Load when**: lint flags a deprecation or the user is migrating an old workflow.
 
-Loop Over Items requires connecting the *processing* branch's last node back to the loop node's main input. Without that back-edge, it runs once and stops. Lint won't catch this; double-check connections.
+## Server setup
 
-## AI Agent / LangChain cluster nodes
-
-n8n's AI nodes use a different connection model. The root is `n8n-nodes-langchain.agent`. Sub-nodes attach *upward* via specialized connection types, not the normal `main` flow:
-
-| Sub-node role | Connection type | Examples |
-|---|---|---|
-| Language model | `ai_languageModel` | `lmChatOpenAi`, `lmChatAnthropic`, `lmChatOllama` |
-| Memory | `ai_memory` | `memoryBufferWindow`, `memoryPostgresChat` |
-| Tools | `ai_tool` | `toolHttpRequest`, `toolCode`, `toolWorkflow`, MCP client |
-| Output parser | `ai_outputParser` | `outputParserStructured` |
-
-In `connections`, the *sub-node* is the source and the agent is the target, with the connection type set:
+Add to the user's MCP config (Cursor: `~/.cursor/mcp.json`, Claude Desktop: `claude_desktop_config.json`):
 
 ```json
-"connections": {
-  "OpenAI Chat Model": {
-    "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
-  },
-  "Buffer Window Memory": {
-    "ai_memory": [[{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]]
+{
+  "mcpServers": {
+    "n8n": {
+      "command": "npx",
+      "args": ["-y", "@automatelab/n8n-mcp"],
+      "env": {
+        "N8N_API_URL": "https://your-n8n.example.com",
+        "N8N_API_KEY": "n8n_..."
+      }
+    }
   }
 }
 ```
 
-Minimum viable agent: trigger -> AI Agent (root) + a chat model sub-node + (optional) memory + (optional) tools. The agent itself flows downstream via `main`.
+The `env` block is optional — the 4 stateless tools work without it. Get an API key from n8n: Settings → API → Create API key.
 
-Tool nodes can wrap arbitrary HTTP requests, sub-workflows, or Code. To call other workflows from an agent, use `toolWorkflow` and reference the sub-workflow's ID.
+---
 
-## Code node: return shape contract
-
-The Code node MUST return an array of items, never a raw object. This is the #1 reason Code nodes "fail mysteriously."
-
-Run Once for All Items (default mode):
-```js
-const out = [];
-for (const item of $input.all()) {
-  out.push({ json: { ...item.json, doubled: item.json.value * 2 } });
-}
-return out;
-```
-
-Run Once for Each Item:
-```js
-return { json: { ...$json, doubled: $json.value * 2 } };
-```
-
-Note the difference: per-all-items returns an *array*; per-each-item returns a *single item object*. n8n collects them.
-
-What breaks:
-- `return $json` - returns one item's payload, not wrapped (per-each-item: missing `json` key; per-all-items: not an array)
-- `return [...]` of plain objects without `{ json: ... }` wrapping
-- Calling `this.getCredentials()` or `$getCredentials()` - not available in Code node, use `$credentials.<name>` only inside expressions on credential-aware nodes
-
-## Workflow JSON conventions
-
-Every node MUST have:
-- `id` - unique UUID per workflow
-- `name` - unique display name (connections key by name, not id)
-- `type` - e.g. `n8n-nodes-base.slack`, `n8n-nodes-base.webhook`
-- `typeVersion` - integer or float; n8n refuses to load a node without one
-- `position` - `[x, y]` array (canvas coordinates, ~220px apart horizontally)
-- `parameters` - object, can be empty `{}`
-
-`connections` is keyed by source node *name*. Each entry: `{ "main": [[{ "node": "<target name>", "type": "main", "index": 0 }]] }`. The double array is real - first level is output index, second is fan-out targets.
-
-Credentials: nodes like `slack`, `gmail`, `googleSheets`, `notion`, `discord`, `stripe`, `httpRequest` (with auth) need a `credentials` block referencing a credential by name. The user creates the credential in n8n's UI; the workflow JSON only references it. Credential names are NOT portable across instances - if you import to a new n8n, recreate credentials with identical names or the workflow will fail at runtime.
-
-## Custom node skeleton
-
-A scaffolded node implements `INodeType`:
-- `description: INodeTypeDescription` - displayName, name, group, version, description, defaults, inputs/outputs, credentials, properties
-- `async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]>` - read inputs via `this.getInputData()`, return `[outputs]` (outer array is per output index)
-
-Drop the file into `nodes/<NodeName>/<nodeName>.node.ts` of a custom n8n package, register in `package.json` `n8n.nodes`, rebuild.
-
-## Import gotchas and deprecations
-
-Lint flags these; you should avoid producing them:
-
-- `n8n-nodes-base.function` -> `n8n-nodes-base.code` (Function and FunctionItem nodes were removed)
-- `n8n-nodes-base.spreadsheetFile` -> `n8n-nodes-base.convertToFile` / `extractFromFile`
-- Missing `typeVersion` on any node - n8n refuses to import
-- `httpRequest` with auth but no credential reference - silently runs unauthenticated
-- IF node v1 syntax (`conditions.boolean[].value1` etc.) - v2+ uses `conditions.options.combinator` and a different operator schema; if generating fresh, target the latest typeVersion
-- Expression-based credential names - not portable across instances; lint warns but lets it through
-- Webhook nodes without a `webhookId` - n8n auto-generates on import, but be explicit if the user needs a stable URL
-
-When in doubt, run `n8n_lint_workflow` against the JSON before returning it.
+Developed by [AutomateLab](https://automatelab.tech). Source: [github.com/ratamaha-git/n8n-mcp](https://github.com/ratamaha-git/n8n-mcp).

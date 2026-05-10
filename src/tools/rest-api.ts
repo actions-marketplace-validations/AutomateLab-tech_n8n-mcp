@@ -1,0 +1,330 @@
+import { z } from "zod";
+
+/**
+ * REST tools that talk to a live n8n instance.
+ *
+ * Auth is read from the environment so the user doesn't paste API keys into
+ * chat. They must set:
+ *   N8N_API_URL   - e.g. https://n8n.example.com (no trailing /api/v1)
+ *   N8N_API_KEY   - n8n personal API key (Settings -> API)
+ *
+ * If either is missing, every tool returns a clear "not configured" message
+ * instead of throwing — keeps the MCP server usable in stateless mode.
+ */
+
+interface ApiConfig {
+	baseUrl: string;
+	apiKey: string;
+}
+
+function getConfig(): ApiConfig | { error: string } {
+	const url = process.env.N8N_API_URL?.trim();
+	const key = process.env.N8N_API_KEY?.trim();
+	if (!url || !key) {
+		return {
+			error:
+				"n8n REST tools are not configured. Set N8N_API_URL (e.g. https://n8n.example.com) and N8N_API_KEY (n8n -> Settings -> API) in the MCP server's environment. The other 4 tools (generate, lint, scaffold, explain) work without these.",
+		};
+	}
+	const trimmed = url.replace(/\/$/, "").replace(/\/api\/v1$/, "");
+	return { baseUrl: `${trimmed}/api/v1`, apiKey: key };
+}
+
+async function call(
+	cfg: ApiConfig,
+	method: string,
+	path: string,
+	body?: unknown,
+): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+	let res: Response;
+	try {
+		res = await fetch(`${cfg.baseUrl}${path}`, {
+			method,
+			headers: {
+				"X-N8N-API-KEY": cfg.apiKey,
+				accept: "application/json",
+				...(body ? { "content-type": "application/json" } : {}),
+			},
+			body: body ? JSON.stringify(body) : undefined,
+		});
+	} catch (err) {
+		return {
+			ok: false,
+			error: `Network error calling ${method} ${path}: ${
+				(err as Error).message
+			}. Verify N8N_API_URL is reachable from this machine.`,
+		};
+	}
+	const text = await res.text();
+	if (!res.ok) {
+		const snippet = text.slice(0, 400);
+		return {
+			ok: false,
+			error: `${method} ${path} -> ${res.status} ${res.statusText}: ${snippet}`,
+		};
+	}
+	if (text.length === 0) return { ok: true, data: null };
+	try {
+		return { ok: true, data: JSON.parse(text) };
+	} catch {
+		return { ok: true, data: text };
+	}
+}
+
+function textResult(text: string) {
+	return { content: [{ type: "text" as const, text }] };
+}
+
+function jsonResult(data: unknown) {
+	return textResult(JSON.stringify(data, null, 2));
+}
+
+// ---------------------------------------------------------------------------
+// n8n_list_workflows
+// ---------------------------------------------------------------------------
+
+export const listWorkflowsInputSchema = {
+	type: "object",
+	properties: {
+		active: {
+			type: "boolean",
+			description: "Filter by active status. Omit to return both.",
+		},
+		tags: {
+			type: "string",
+			description: "Comma-separated tag names to filter by.",
+		},
+		name: {
+			type: "string",
+			description: "Filter by exact workflow name.",
+		},
+		limit: {
+			type: "number",
+			description: "Page size (n8n default: 100, max: 250).",
+		},
+	},
+} as const;
+
+const listWorkflowsZod = z.object({
+	active: z.boolean().optional(),
+	tags: z.string().optional(),
+	name: z.string().optional(),
+	limit: z.number().int().positive().max(250).optional(),
+});
+
+export async function listWorkflows(rawArgs: unknown) {
+	const cfg = getConfig();
+	if ("error" in cfg) return textResult(cfg.error);
+	const args = listWorkflowsZod.parse(rawArgs ?? {});
+	const params = new URLSearchParams();
+	if (args.active !== undefined) params.set("active", String(args.active));
+	if (args.tags) params.set("tags", args.tags);
+	if (args.name) params.set("name", args.name);
+	if (args.limit) params.set("limit", String(args.limit));
+	const qs = params.toString() ? `?${params}` : "";
+	const r = await call(cfg, "GET", `/workflows${qs}`);
+	if (!r.ok) return textResult(r.error);
+	const data = r.data as { data?: unknown[] } | unknown[];
+	const arr = Array.isArray(data) ? data : data?.data ?? [];
+	const summary = (arr as Array<Record<string, unknown>>).map((w) => ({
+		id: w.id,
+		name: w.name,
+		active: w.active,
+		nodeCount: Array.isArray(w.nodes) ? (w.nodes as unknown[]).length : undefined,
+		updatedAt: w.updatedAt,
+		tags: Array.isArray(w.tags)
+			? (w.tags as Array<{ name?: string }>).map((t) => t.name).filter(Boolean)
+			: undefined,
+	}));
+	return jsonResult(summary);
+}
+
+// ---------------------------------------------------------------------------
+// n8n_get_workflow
+// ---------------------------------------------------------------------------
+
+export const getWorkflowInputSchema = {
+	type: "object",
+	properties: {
+		id: { type: "string", description: "Workflow ID." },
+	},
+	required: ["id"],
+} as const;
+
+const getWorkflowZod = z.object({ id: z.string().min(1) });
+
+export async function getWorkflow(rawArgs: unknown) {
+	const cfg = getConfig();
+	if ("error" in cfg) return textResult(cfg.error);
+	const args = getWorkflowZod.parse(rawArgs);
+	const r = await call(cfg, "GET", `/workflows/${encodeURIComponent(args.id)}`);
+	if (!r.ok) return textResult(r.error);
+	return jsonResult(r.data);
+}
+
+// ---------------------------------------------------------------------------
+// n8n_create_workflow
+// ---------------------------------------------------------------------------
+
+export const createWorkflowInputSchema = {
+	type: "object",
+	properties: {
+		workflow: {
+			description:
+				"Workflow JSON to create (typically the output of n8n_generate_workflow). Either a parsed object or a JSON string.",
+			oneOf: [{ type: "object" }, { type: "string" }],
+		},
+	},
+	required: ["workflow"],
+} as const;
+
+const createWorkflowZod = z.object({
+	workflow: z.union([z.record(z.unknown()), z.string()]),
+});
+
+export async function createWorkflow(rawArgs: unknown) {
+	const cfg = getConfig();
+	if ("error" in cfg) return textResult(cfg.error);
+	const args = createWorkflowZod.parse(rawArgs);
+	const wf =
+		typeof args.workflow === "string"
+			? safeParse(args.workflow)
+			: args.workflow;
+	if (!wf || typeof wf !== "object" || Array.isArray(wf)) {
+		return textResult("Workflow payload is not a JSON object.");
+	}
+	const body = stripReadOnly(wf as Record<string, unknown>);
+	const r = await call(cfg, "POST", "/workflows", body);
+	if (!r.ok) return textResult(r.error);
+	const created = r.data as Record<string, unknown> | null;
+	if (created && typeof created === "object" && "id" in created) {
+		return textResult(
+			`Created workflow "${
+				(created.name as string) ?? "(unnamed)"
+			}" with id ${created.id}. Activate it with n8n_activate_workflow.`,
+		);
+	}
+	return jsonResult(r.data);
+}
+
+// ---------------------------------------------------------------------------
+// n8n_activate_workflow
+// ---------------------------------------------------------------------------
+
+export const activateWorkflowInputSchema = {
+	type: "object",
+	properties: {
+		id: { type: "string", description: "Workflow ID." },
+		active: {
+			type: "boolean",
+			description:
+				"Defaults to true (activate). Set false to deactivate.",
+		},
+	},
+	required: ["id"],
+} as const;
+
+const activateWorkflowZod = z.object({
+	id: z.string().min(1),
+	active: z.boolean().optional(),
+});
+
+export async function activateWorkflow(rawArgs: unknown) {
+	const cfg = getConfig();
+	if ("error" in cfg) return textResult(cfg.error);
+	const args = activateWorkflowZod.parse(rawArgs);
+	const action = args.active === false ? "deactivate" : "activate";
+	const r = await call(
+		cfg,
+		"POST",
+		`/workflows/${encodeURIComponent(args.id)}/${action}`,
+	);
+	if (!r.ok) return textResult(r.error);
+	return textResult(`Workflow ${args.id} ${action}d.`);
+}
+
+// ---------------------------------------------------------------------------
+// n8n_list_executions
+// ---------------------------------------------------------------------------
+
+export const listExecutionsInputSchema = {
+	type: "object",
+	properties: {
+		workflowId: { type: "string", description: "Filter by workflow ID." },
+		status: {
+			type: "string",
+			description: "Filter by status: success | error | waiting.",
+			enum: ["success", "error", "waiting"],
+		},
+		limit: {
+			type: "number",
+			description: "Page size (n8n default: 100, max: 250).",
+		},
+		includeData: {
+			type: "boolean",
+			description:
+				"Include full execution data (large). Default false — pair with n8n_explain_execution.",
+		},
+	},
+} as const;
+
+const listExecutionsZod = z.object({
+	workflowId: z.string().optional(),
+	status: z.enum(["success", "error", "waiting"]).optional(),
+	limit: z.number().int().positive().max(250).optional(),
+	includeData: z.boolean().optional(),
+});
+
+export async function listExecutions(rawArgs: unknown) {
+	const cfg = getConfig();
+	if ("error" in cfg) return textResult(cfg.error);
+	const args = listExecutionsZod.parse(rawArgs ?? {});
+	const params = new URLSearchParams();
+	if (args.workflowId) params.set("workflowId", args.workflowId);
+	if (args.status) params.set("status", args.status);
+	if (args.limit) params.set("limit", String(args.limit));
+	if (args.includeData) params.set("includeData", "true");
+	const qs = params.toString() ? `?${params}` : "";
+	const r = await call(cfg, "GET", `/executions${qs}`);
+	if (!r.ok) return textResult(r.error);
+	if (args.includeData) return jsonResult(r.data);
+	const data = r.data as { data?: unknown[] } | unknown[];
+	const arr = Array.isArray(data) ? data : data?.data ?? [];
+	const summary = (arr as Array<Record<string, unknown>>).map((e) => ({
+		id: e.id,
+		workflowId: e.workflowId,
+		status: e.status,
+		mode: e.mode,
+		startedAt: e.startedAt,
+		stoppedAt: e.stoppedAt,
+		finished: e.finished,
+	}));
+	return jsonResult(summary);
+}
+
+// ---------------------------------------------------------------------------
+
+function stripReadOnly(wf: Record<string, unknown>): Record<string, unknown> {
+	const out: Record<string, unknown> = { ...wf };
+	for (const k of [
+		"id",
+		"active",
+		"createdAt",
+		"updatedAt",
+		"versionId",
+		"triggerCount",
+		"shared",
+		"tags",
+	]) {
+		delete out[k];
+	}
+	return out;
+}
+
+function safeParse(s: string): unknown {
+	try {
+		return JSON.parse(s);
+	} catch {
+		return null;
+	}
+}

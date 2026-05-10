@@ -17,6 +17,24 @@ import {
 	lintWorkflow,
 	lintWorkflowInputSchema,
 } from "./tools/lint-workflow.js";
+import {
+	explainExecution,
+	explainExecutionInputSchema,
+} from "./tools/explain-execution.js";
+import {
+	activateWorkflow,
+	activateWorkflowInputSchema,
+	createWorkflow,
+	createWorkflowInputSchema,
+	getWorkflow,
+	getWorkflowInputSchema,
+	listExecutions,
+	listExecutionsInputSchema,
+	listWorkflows,
+	listWorkflowsInputSchema,
+} from "./tools/rest-api.js";
+
+const VERSION = "0.3.0";
 
 const tools = [
 	{
@@ -37,12 +55,48 @@ const tools = [
 			"Lint an n8n workflow JSON. Returns concrete errors and warnings: missing credentials, deprecated node types (Function -> Code, spreadsheetFile -> convertToFile/extractFromFile), broken connections, missing or non-numeric typeVersion, duplicate node names or IDs, AI Agent missing ai_languageModel sub-node, Webhook missing webhookId, IF node still on v1 condition schema.",
 		inputSchema: lintWorkflowInputSchema,
 	},
+	{
+		name: "n8n_explain_execution",
+		description:
+			"Diagnose a failed or surprising n8n execution. Paste the execution JSON (from the n8n UI 'Show details' or `GET /executions/:id?includeData=true`); returns a per-node summary highlighting nodes that returned 0 items, unresolved `={{ ... }}` expressions, errors with hints, and LLM token usage. Hits the most common debugging pain point: items 'silently disappearing' between nodes.",
+		inputSchema: explainExecutionInputSchema,
+	},
+	{
+		name: "n8n_list_workflows",
+		description:
+			"List workflows from a live n8n instance (requires N8N_API_URL + N8N_API_KEY env vars). Returns id, name, active, nodeCount, updatedAt, tags. Filter by active, tags, name. Use this when the user asks 'what workflows do I have?' or before n8n_get_workflow.",
+		inputSchema: listWorkflowsInputSchema,
+	},
+	{
+		name: "n8n_get_workflow",
+		description:
+			"Fetch a single workflow JSON by id from a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Returns the full nodes/connections payload — pair with n8n_lint_workflow to audit a deployed workflow.",
+		inputSchema: getWorkflowInputSchema,
+	},
+	{
+		name: "n8n_create_workflow",
+		description:
+			"Create a workflow on a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Strips read-only fields (id, active, createdAt, ...) before posting. Workflows are created inactive — call n8n_activate_workflow afterward. Pairs with n8n_generate_workflow for end-to-end 'describe -> deploy'.",
+		inputSchema: createWorkflowInputSchema,
+	},
+	{
+		name: "n8n_activate_workflow",
+		description:
+			"Activate or deactivate a workflow on a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Pass `active: false` to deactivate.",
+		inputSchema: activateWorkflowInputSchema,
+	},
+	{
+		name: "n8n_list_executions",
+		description:
+			"List recent executions from a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Filter by workflowId, status (success|error|waiting), limit. Pass `includeData: true` to get the full execution body (large) — pair with n8n_explain_execution to diagnose a specific failure.",
+		inputSchema: listExecutionsInputSchema,
+	},
 ];
 
 const server = new Server(
 	{
 		name: "n8n-mcp",
-		version: "0.2.1",
+		version: VERSION,
 	},
 	{
 		capabilities: { tools: {} },
@@ -60,6 +114,18 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 			return generateWorkflow(args ?? {});
 		case "n8n_lint_workflow":
 			return lintWorkflow(args ?? {});
+		case "n8n_explain_execution":
+			return explainExecution(args ?? {});
+		case "n8n_list_workflows":
+			return listWorkflows(args ?? {});
+		case "n8n_get_workflow":
+			return getWorkflow(args ?? {});
+		case "n8n_create_workflow":
+			return createWorkflow(args ?? {});
+		case "n8n_activate_workflow":
+			return activateWorkflow(args ?? {});
+		case "n8n_list_executions":
+			return listExecutions(args ?? {});
 		default:
 			throw new Error(`Unknown tool: ${name}`);
 	}
@@ -69,7 +135,7 @@ async function main() {
 	if (process.argv.includes("--smoke")) {
 		const summary = {
 			server: "n8n-mcp",
-			version: "0.2.1",
+			version: VERSION,
 			tools: tools.map((t) => t.name),
 		};
 		process.stdout.write(JSON.stringify(summary, null, 2) + "\n");
