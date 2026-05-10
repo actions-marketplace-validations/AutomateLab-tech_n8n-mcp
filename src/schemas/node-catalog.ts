@@ -10,7 +10,26 @@ export const DEPRECATED_NODE_TYPES: Record<string, string> = {
 	"n8n-nodes-base.function": "n8n-nodes-base.code",
 	"n8n-nodes-base.functionItem": "n8n-nodes-base.code",
 	"n8n-nodes-base.start": "n8n-nodes-base.manualTrigger",
+	"n8n-nodes-base.spreadsheetFile":
+		"n8n-nodes-base.convertToFile or n8n-nodes-base.extractFromFile",
 };
+
+/**
+ * AI agent root types. Both prefixes appear in the wild: the older
+ * `n8n-nodes-langchain.*` and the canonical `@n8n/n8n-nodes-langchain.*`.
+ */
+export const AI_AGENT_TYPES = new Set<string>([
+	"n8n-nodes-langchain.agent",
+	"@n8n/n8n-nodes-langchain.agent",
+]);
+
+export const WEBHOOK_TYPES = new Set<string>([
+	"n8n-nodes-base.webhook",
+]);
+
+export const IF_NODE_TYPES = new Set<string>([
+	"n8n-nodes-base.if",
+]);
 
 export const CREDENTIAL_REQUIRED_TYPES = new Set<string>([
 	"n8n-nodes-base.airtable",

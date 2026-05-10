@@ -38,6 +38,15 @@ interface MainConnection {
 	index: number;
 }
 
+interface WireConnection {
+	node: string;
+	type: string;
+	index: number;
+}
+
+const AI_AGENT_PATTERN =
+	/\b(ai\s+agent|llm\s+agent|chatbot|chat\s*bot|gpt|claude|langchain|conversational\s+agent)\b/i;
+
 const TRIGGER_PATTERNS: { match: RegExp; build: () => NodeSpec }[] = [
 	{
 		match: /\bwebhook\b/i,
@@ -200,6 +209,10 @@ function deriveName(description: string): string {
 export async function generateWorkflow(rawArgs: unknown) {
 	const args = inputZod.parse(rawArgs);
 
+	if (AI_AGENT_PATTERN.test(args.description)) {
+		return buildAiAgentWorkflow(args);
+	}
+
 	let trigger: NodeSpec | null = null;
 	for (const p of TRIGGER_PATTERNS) {
 		if (p.match.test(args.description)) {
@@ -251,6 +264,99 @@ export async function generateWorkflow(rawArgs: unknown) {
 			],
 		},
 	};
+
+	const workflow = {
+		name: args.name ?? deriveName(args.description),
+		nodes,
+		connections,
+		active: false,
+		settings: { executionOrder: "v1" },
+		pinData: {},
+	};
+
+	return {
+		content: [
+			{ type: "text" as const, text: JSON.stringify(workflow, null, 2) },
+		],
+	};
+}
+
+function buildAiAgentWorkflow(args: { description: string; name?: string }) {
+	const trigger: NodeSpec = {
+		id: randomUUID(),
+		name: "When chat message received",
+		type: "@n8n/n8n-nodes-langchain.chatTrigger",
+		typeVersion: 1.1,
+		position: [240, 300],
+		parameters: { options: {} },
+	};
+
+	const agent: NodeSpec = {
+		id: randomUUID(),
+		name: "AI Agent",
+		type: "@n8n/n8n-nodes-langchain.agent",
+		typeVersion: 1.7,
+		position: [480, 300],
+		parameters: { options: {} },
+	};
+
+	const chatModel: NodeSpec = {
+		id: randomUUID(),
+		name: "OpenAI Chat Model",
+		type: "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+		typeVersion: 1.2,
+		position: [400, 480],
+		parameters: {
+			model: { __rl: true, mode: "list", value: "gpt-4o-mini" },
+			options: {},
+		},
+	};
+
+	const memory: NodeSpec = {
+		id: randomUUID(),
+		name: "Window Buffer Memory",
+		type: "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+		typeVersion: 1.3,
+		position: [560, 480],
+		parameters: {},
+	};
+
+	const nodes: NodeSpec[] = [trigger, agent, chatModel, memory];
+
+	const connections: Record<string, Record<string, WireConnection[][]>> = {
+		[trigger.name]: {
+			main: [[{ node: agent.name, type: "main", index: 0 }]],
+		},
+		[chatModel.name]: {
+			ai_languageModel: [
+				[{ node: agent.name, type: "ai_languageModel", index: 0 }],
+			],
+		},
+		[memory.name]: {
+			ai_memory: [[{ node: agent.name, type: "ai_memory", index: 0 }]],
+		},
+	};
+
+	if (/\b(http|api|tool|fetch)\b/i.test(args.description)) {
+		const httpTool: NodeSpec = {
+			id: randomUUID(),
+			name: "HTTP Request Tool",
+			type: "@n8n/n8n-nodes-langchain.toolHttpRequest",
+			typeVersion: 1.1,
+			position: [720, 480],
+			parameters: {
+				toolDescription:
+					"Call an external HTTP API. Replace the URL and parameters before running.",
+				url: "https://example.com/api",
+				method: "GET",
+				sendBody: false,
+			},
+		};
+		nodes.push(httpTool);
+		connections[httpTool.name] = {
+			ai_tool: [[{ node: agent.name, type: "ai_tool", index: 0 }]],
+		};
+	}
 
 	const workflow = {
 		name: args.name ?? deriveName(args.description),

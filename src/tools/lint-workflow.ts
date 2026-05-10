@@ -1,7 +1,10 @@
 import { z } from "zod";
 import {
+	AI_AGENT_TYPES,
 	CREDENTIAL_REQUIRED_TYPES,
 	DEPRECATED_NODE_TYPES,
+	IF_NODE_TYPES,
+	WEBHOOK_TYPES,
 } from "../schemas/node-catalog.js";
 
 export const lintWorkflowInputSchema = {
@@ -59,6 +62,28 @@ export async function lintWorkflow(rawArgs: unknown) {
 
 	const nodeNames = new Set<string>();
 	const seenIds = new Set<string>();
+	const incomingByType: Record<string, Map<string, number>> = {};
+
+	for (const [src, conf] of Object.entries(connections)) {
+		if (!conf || typeof conf !== "object") continue;
+		for (const [connType, branches] of Object.entries(
+			conf as Record<string, unknown>,
+		)) {
+			if (!Array.isArray(branches)) continue;
+			for (const branch of branches) {
+				if (!Array.isArray(branch)) continue;
+				for (const c of branch) {
+					if (!c || typeof c !== "object") continue;
+					const target = (c as Record<string, unknown>).node;
+					if (typeof target !== "string") continue;
+					const map = (incomingByType[connType] ??= new Map());
+					map.set(target, (map.get(target) ?? 0) + 1);
+				}
+			}
+		}
+		// keep src referenced
+		void src;
+	}
 
 	for (const raw of nodes) {
 		if (!raw || typeof raw !== "object") {
@@ -145,6 +170,51 @@ export async function lintWorkflow(rawArgs: unknown) {
 				node: nodeName,
 				message: `Node type "${nodeType}" usually needs a credential. None set.`,
 			});
+		}
+
+		if (nodeType && AI_AGENT_TYPES.has(nodeType) && nodeName) {
+			const lm = incomingByType["ai_languageModel"]?.get(nodeName) ?? 0;
+			if (lm === 0) {
+				issues.push({
+					severity: "error",
+					node: nodeName,
+					message:
+						"AI Agent has no `ai_languageModel` sub-node connected. Attach a chat model (e.g. lmChatOpenAi).",
+				});
+			}
+		}
+
+		if (nodeType && WEBHOOK_TYPES.has(nodeType) && !n.webhookId) {
+			issues.push({
+				severity: "warning",
+				node: nodeName,
+				message:
+					"Webhook node has no `webhookId`. n8n auto-generates one on import, so the production URL will change. Set `webhookId` to keep a stable URL.",
+			});
+		}
+
+		if (nodeType && IF_NODE_TYPES.has(nodeType)) {
+			const params =
+				n.parameters && typeof n.parameters === "object"
+					? (n.parameters as Record<string, unknown>)
+					: {};
+			const conditions = params.conditions as Record<string, unknown> | undefined;
+			const looksLikeV1 =
+				conditions !== undefined &&
+				typeof conditions === "object" &&
+				!Array.isArray(conditions) &&
+				("boolean" in conditions ||
+					"string" in conditions ||
+					"number" in conditions ||
+					"dateTime" in conditions);
+			if (looksLikeV1) {
+				issues.push({
+					severity: "warning",
+					node: nodeName,
+					message:
+						"IF node uses v1 condition schema (`conditions.boolean[]` etc.). Bump `typeVersion` to 2+ and switch to the v2 condition shape (`conditions.options`, `conditions.conditions[]`, `conditions.combinator`).",
+				});
+			}
 		}
 	}
 

@@ -28,13 +28,13 @@ const tools = [
 	{
 		name: "n8n_generate_workflow",
 		description:
-			"Generate a valid n8n workflow JSON from a plain-English description. Returns workflow JSON with unique node IDs, connections, positions, and typeVersion on every node.",
+			"Generate a valid n8n workflow JSON from a plain-English description. Handles webhook/schedule/RSS triggers, common action nodes (Slack, Google Sheets, Discord, Gmail, Notion, HTTP), and AI Agent setups (LangChain root agent + chat model + memory + optional HTTP tool, wired with ai_languageModel / ai_memory / ai_tool connections). Returns workflow JSON with unique node IDs, connections, positions, and typeVersion on every node.",
 		inputSchema: generateWorkflowInputSchema,
 	},
 	{
 		name: "n8n_lint_workflow",
 		description:
-			"Lint an n8n workflow JSON. Returns a list of concrete errors and warnings: missing credentials, deprecated node types (Function -> Code), broken connections, missing typeVersion, duplicate node names or IDs.",
+			"Lint an n8n workflow JSON. Returns concrete errors and warnings: missing credentials, deprecated node types (Function -> Code, spreadsheetFile -> convertToFile/extractFromFile), broken connections, missing or non-numeric typeVersion, duplicate node names or IDs, AI Agent missing ai_languageModel sub-node, Webhook missing webhookId, IF node still on v1 condition schema.",
 		inputSchema: lintWorkflowInputSchema,
 	},
 ];
@@ -42,7 +42,7 @@ const tools = [
 const server = new Server(
 	{
 		name: "n8n-mcp",
-		version: "0.1.1",
+		version: "0.2.0",
 	},
 	{
 		capabilities: { tools: {} },
@@ -69,7 +69,7 @@ async function main() {
 	if (process.argv.includes("--smoke")) {
 		const summary = {
 			server: "n8n-mcp",
-			version: "0.1.1",
+			version: "0.2.0",
 			tools: tools.map((t) => t.name),
 		};
 		process.stdout.write(JSON.stringify(summary, null, 2) + "\n");
