@@ -1,6 +1,6 @@
 # n8n-mcp
 
-An [MCP](https://modelcontextprotocol.io) server that gives Claude, Cursor, and other MCP-compatible agents nine tools for working with [n8n](https://n8n.io): scaffold a custom node, generate workflow JSON, lint, **diagnose failed executions**, and drive a live n8n instance via REST.
+An [MCP](https://modelcontextprotocol.io) server for [n8n](https://n8n.io) that gives Claude, Cursor, and other AI agents tools for generating workflows, linting, diagnosing failed executions, and driving live n8n instances.
 
 [![npm](https://img.shields.io/npm/v/@automatelab/n8n-mcp.svg)](https://www.npmjs.com/package/@automatelab/n8n-mcp)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
