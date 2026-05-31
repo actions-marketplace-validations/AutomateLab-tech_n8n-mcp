@@ -2,7 +2,10 @@
   "mcpServers": {
     "n8n": {
       "command": "npx",
-      "args": ["-y", "@automatelab/n8n-mcp"]
+      "args": [
+        "-y",
+        "@automatelab/n8n-mcp"
+      ]
     }
   }
 }
