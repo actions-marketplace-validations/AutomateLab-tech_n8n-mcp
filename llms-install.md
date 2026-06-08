@@ -20,10 +20,10 @@ npm install -g @automatelab/n8n-mcp
 ### Option 1: Without Live n8n Instance (Stateless)
 
 Use the 4 stateless tools that work without connecting to a live n8n instance:
-- `workflow.generate` - plain-English description → workflow JSON
-- `node.scaffold` - description → custom `INodeType` TypeScript file
-- `workflow.lint` - workflow JSON → list of errors and warnings
-- `execution.explain` - failed execution JSON → per-node diagnosis
+- `workflow_generate` - plain-English description → workflow JSON
+- `node_scaffold` - description → custom `INodeType` TypeScript file
+- `workflow_lint` - workflow JSON → list of errors and warnings
+- `execution_explain` - failed execution JSON → per-node diagnosis
 
 In Cline's `cline_config.json` (or `.cline/mcp.json`):
 
@@ -67,36 +67,36 @@ In Cline's `cline_config.json`:
 
 | Tool | Purpose |
 |------|---------|
-| `workflow.generate` | Plain-English description → workflow JSON. Detects AI-agent topology and emits proper LangChain clusters. |
-| `node.scaffold` | Description → single custom node TypeScript file ready to package. |
-| `workflow.lint` | Workflow JSON → list of issues (deprecated types, missing `typeVersion`, broken connections, AI Agent missing language model, etc.). |
-| `execution.explain` | Failed execution JSON → per-node findings with concrete hints. Catches silent data loss between nodes. |
+| `workflow_generate` | Plain-English description → workflow JSON. Detects AI-agent topology and emits proper LangChain clusters. |
+| `node_scaffold` | Description → single custom node TypeScript file ready to package. |
+| `workflow_lint` | Workflow JSON → list of issues (deprecated types, missing `typeVersion`, broken connections, AI Agent missing language model, etc.). |
+| `execution_explain` | Failed execution JSON → per-node findings with concrete hints. Catches silent data loss between nodes. |
 
 **Live-Instance Tools** (require `N8N_API_URL` + `N8N_API_KEY`):
 
 | Tool | Purpose |
 |------|---------|
-| `workflow.list` | Paginate workflows; filter by active/tags/name. |
-| `workflow.get` | Fetch a workflow by id. Pair with lint to audit deployed workflows. |
-| `workflow.create` | POST a generated workflow. Strips read-only fields. |
-| `workflow.activate` | Flip active on/off. |
-| `execution.list` | Browse executions; pass `includeData: true` for full body. Pair with explain to diagnose failures. |
+| `workflow_list` | Paginate workflows; filter by active/tags/name. |
+| `workflow_get` | Fetch a workflow by id. Pair with lint to audit deployed workflows. |
+| `workflow_create` | POST a generated workflow. Strips read-only fields. |
+| `workflow_activate` | Flip active on/off. |
+| `execution_list` | Browse executions; pass `includeData: true` for full body. Pair with explain to diagnose failures. |
 
 ## Usage Patterns
 
 **Generate and lint a workflow**:
-1. Use `workflow.generate` with your plain-English description
-2. Use `workflow.lint` on the result to catch issues before import
+1. Use `workflow_generate` with your plain-English description
+2. Use `workflow_lint` on the result to catch issues before import
 
 **Deploy to your n8n instance**:
 1. Generate and lint the workflow
-2. Use `workflow.create` to POST it (created inactive)
-3. Use `workflow.activate` to turn it on
+2. Use `workflow_create` to POST it (created inactive)
+3. Use `workflow_activate` to turn it on
 
 **Diagnose a failed execution**:
-1. Use `execution.list` with `{status: "error"}` filter
-2. Use `execution.list` with `{includeData: true}` on the execution id to get full data
-3. Use `execution.explain` to get per-node diagnosis with hints
+1. Use `execution_list` with `{status: "error"}` filter
+2. Use `execution_list` with `{includeData: true}` on the execution id to get full data
+3. Use `execution_explain` to get per-node diagnosis with hints
 
 ## Examples
 
@@ -129,7 +129,7 @@ See the project repository for detailed reference files.
 - Get a fresh API key from n8n: Settings → API → Create API key
 
 **"Silent data loss" in workflows?**
-- Use `execution.explain` to diagnose which nodes returned 0 items
+- Use `execution_explain` to diagnose which nodes returned 0 items
 - Check IF/Switch node conditions and Filter node parameters
 - Verify upstream nodes are actually returning data
 

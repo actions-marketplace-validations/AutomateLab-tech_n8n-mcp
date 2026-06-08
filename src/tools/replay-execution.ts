@@ -143,7 +143,7 @@ export async function replayExecution(rawArgs: unknown) {
 
 	const note = items.length === 0
 		? "Replay built but the seed has no items. The target node will not run."
-		: `Replay workflow built. Trigger -> Replay Seed (${items.length} item${items.length === 1 ? "" : "s"}) -> ${args.node}. Import into n8n via the UI's 'Import from URL/file' or push via workflow.create.`;
+		: `Replay workflow built. Trigger -> Replay Seed (${items.length} item${items.length === 1 ? "" : "s"}) -> ${args.node}. Import into n8n via the UI's 'Import from URL/file' or push via workflow_create.`;
 
 	return {
 		content: [

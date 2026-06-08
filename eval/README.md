@@ -1,6 +1,6 @@
 # n8n-mcp Eval Suite
 
-Golden-workflow regression suite for the `workflow.lint` tool. Each fixture pair (workflow + expected) pins a specific lint rule so regressions are caught immediately.
+Golden-workflow regression suite for the `workflow_lint` tool. Each fixture pair (workflow + expected) pins a specific lint rule so regressions are caught immediately.
 
 ## Directory Layout
 

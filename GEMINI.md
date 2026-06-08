@@ -10,33 +10,33 @@ Tool names use dot-notation: `node.*`, `workflow.*`, `execution.*` (renamed in v
 
 **Stateless tools** (work without any n8n instance):
 
-- `workflow.generate` - plain-English description -> workflow JSON. Detects AI-agent intent and emits a LangChain cluster.
-- `node.scaffold` - description -> single `INodeType` TypeScript file for a custom n8n package.
-- `workflow.lint` - workflow JSON -> list of issues (deprecated types, missing `typeVersion`, broken connections, AI Agent without `ai_languageModel`, IF v1 schema, etc.).
-- `execution.explain` - failed/surprising execution JSON -> diagnosis. Catches the #1 n8n pain point: items "silently disappearing" between nodes. Also flags unresolved `={{ ... }}` expressions and surfaces LLM token usage.
+- `workflow_generate` - plain-English description -> workflow JSON. Detects AI-agent intent and emits a LangChain cluster.
+- `node_scaffold` - description -> single `INodeType` TypeScript file for a custom n8n package.
+- `workflow_lint` - workflow JSON -> list of issues (deprecated types, missing `typeVersion`, broken connections, AI Agent without `ai_languageModel`, IF v1 schema, etc.).
+- `execution_explain` - failed/surprising execution JSON -> diagnosis. Catches the #1 n8n pain point: items "silently disappearing" between nodes. Also flags unresolved `={{ ... }}` expressions and surfaces LLM token usage.
 
 **Live-instance tools** (require `N8N_API_URL` + `N8N_API_KEY` env vars):
 
-- `workflow.list` - paginate workflows; filter by active/tags/name.
-- `workflow.get` - fetch a workflow by id. Pair with `workflow.lint` to audit deployed workflows.
-- `workflow.create` - POST a generated workflow. Strips read-only fields. Workflow is created inactive.
-- `workflow.activate` - flip active on/off.
-- `execution.list` - browse executions; pass `includeData: true` for the full body. Pair with `execution.explain`.
+- `workflow_list` - paginate workflows; filter by active/tags/name.
+- `workflow_get` - fetch a workflow by id. Pair with `workflow_lint` to audit deployed workflows.
+- `workflow_create` - POST a generated workflow. Strips read-only fields. Workflow is created inactive.
+- `workflow_activate` - flip active on/off.
+- `execution_list` - browse executions; pass `includeData: true` for the full body. Pair with `execution_explain`.
 
 Default chains:
-- *Generate, then ship*: `workflow.generate` -> `workflow.lint` -> (if env configured) `workflow.create` -> `workflow.activate`.
-- *Audit a deployed workflow*: `workflow.list` -> `workflow.get` -> `workflow.lint`.
-- *Diagnose a failure*: `execution.list {status: "error"}` -> pick one -> `execution.list {includeData: true, ...}` -> `execution.explain`.
+- *Generate, then ship*: `workflow_generate` -> `workflow_lint` -> (if env configured) `workflow_create` -> `workflow_activate`.
+- *Audit a deployed workflow*: `workflow_list` -> `workflow_get` -> `workflow_lint`.
+- *Diagnose a failure*: `execution_list {status: "error"}` -> pick one -> `execution_list {includeData: true, ...}` -> `execution_explain`.
 
 ## When the user describes a flow
 
-1. Run `workflow.generate` with their description verbatim.
-2. Run `workflow.lint` on the result.
+1. Run `workflow_generate` with their description verbatim.
+2. Run `workflow_lint` on the result.
 3. If lint clean -> return the JSON. If warnings -> return JSON + a one-line summary of warnings. If errors -> fix them before returning.
 
 ## When the user pastes execution data and says "why is X empty?"
 
-1. Run `execution.explain` with the JSON.
+1. Run `execution_explain` with the JSON.
 2. Read the findings; if the answer is in the report, summarize. Otherwise inspect the workflow node's `parameters` block manually.
 
 ## Loading deeper context

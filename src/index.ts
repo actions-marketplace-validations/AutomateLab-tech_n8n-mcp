@@ -48,7 +48,7 @@ const server = new McpServer({
 //
 // Tools can be disabled at runtime via env vars — see src/policy.ts:
 //   N8N_MCP_READ_ONLY=1
-//   N8N_MCP_DISABLED_TOOLS=workflow.create,workflow.activate
+//   N8N_MCP_DISABLED_TOOLS=workflow_create,workflow_activate
 //   N8N_MCP_ALLOWED_WORKFLOW_IDS=abc123,def456
 //   N8N_MCP_ALLOWED_TAGS=prod,staging
 // ---------------------------------------------------------------------------
@@ -65,9 +65,9 @@ function maybeRegisterTool(
 	(server.registerTool as any)(name, config, handler);
 }
 
-// --- node.scaffold ---
+// --- node_scaffold ---
 maybeRegisterTool(
-	"node.scaffold",
+	"node_scaffold",
 	{
 		title: "Scaffold an n8n custom node",
 		description:
@@ -99,9 +99,9 @@ maybeRegisterTool(
 	async (input) => scaffoldNode(input),
 );
 
-// --- workflow.generate ---
+// --- workflow_generate ---
 maybeRegisterTool(
-	"workflow.generate",
+	"workflow_generate",
 	{
 		title: "Generate an n8n workflow from a description",
 		description:
@@ -132,9 +132,9 @@ maybeRegisterTool(
 	async (input) => generateWorkflow(input),
 );
 
-// --- workflow.lint ---
+// --- workflow_lint ---
 maybeRegisterTool(
-	"workflow.lint",
+	"workflow_lint",
 	{
 		title: "Lint an n8n workflow JSON",
 		description:
@@ -158,13 +158,13 @@ maybeRegisterTool(
 	async (input) => lintWorkflow(input),
 );
 
-// --- workflow.diff ---
+// --- workflow_diff ---
 maybeRegisterTool(
-	"workflow.diff",
+	"workflow_diff",
 	{
 		title: "Semantic diff between two n8n workflows",
 		description:
-			"Semantic diff between two workflows. Reports nodes added / removed / modified (with field-level deltas: type, typeVersion, parameters, credentials, disabled, position), connection topology changes, and settings drift. Ignores noise (small position deltas, createdAt/updatedAt). Pair with workflow.get to compare deployed vs local. Deterministic.",
+			"Semantic diff between two workflows. Reports nodes added / removed / modified (with field-level deltas: type, typeVersion, parameters, credentials, disabled, position), connection topology changes, and settings drift. Ignores noise (small position deltas, createdAt/updatedAt). Pair with workflow_get to compare deployed vs local. Deterministic.",
 		inputSchema: {
 			before: z
 				.union([z.record(z.unknown()), z.string()])
@@ -185,9 +185,9 @@ maybeRegisterTool(
 	async (input) => diffWorkflow(input),
 );
 
-// --- execution.explain ---
+// --- execution_explain ---
 maybeRegisterTool(
-	"execution.explain",
+	"execution_explain",
 	{
 		title: "Explain a failed n8n execution",
 		description:
@@ -211,13 +211,13 @@ maybeRegisterTool(
 	async (input) => explainExecution(input),
 );
 
-// --- execution.replay ---
+// --- execution_replay ---
 maybeRegisterTool(
-	"execution.replay",
+	"execution_replay",
 	{
 		title: "Build a replay workflow for one node",
 		description:
-			"Build a self-contained replay workflow that exercises a single node from a larger workflow. The replay workflow is Manual Trigger -> Replay Seed (Code node with pinned items) -> target node. Optional `inputItems` or an `execution` payload pins what the target sees. Useful for iterating on one stubborn node without re-running the whole pipeline. Returns workflow JSON ready to import or push via workflow.create.",
+			"Build a self-contained replay workflow that exercises a single node from a larger workflow. The replay workflow is Manual Trigger -> Replay Seed (Code node with pinned items) -> target node. Optional `inputItems` or an `execution` payload pins what the target sees. Useful for iterating on one stubborn node without re-running the whole pipeline. Returns workflow JSON ready to import or push via workflow_create.",
 		inputSchema: {
 			workflow: z
 				.union([z.record(z.unknown()), z.string()])
@@ -248,13 +248,13 @@ maybeRegisterTool(
 	async (input) => replayExecution(input),
 );
 
-// --- execution.timeline ---
+// --- execution_timeline ---
 maybeRegisterTool(
-	"execution.timeline",
+	"execution_timeline",
 	{
 		title: "Render an execution as a per-node timeline",
 		description:
-			"Render an n8n execution as a per-node timeline: start offset, duration, items in/out, error flag. Complements execution.explain — that one surfaces *why*, this surfaces *when*. Output is a markdown table sorted by start time. Deterministic.",
+			"Render an n8n execution as a per-node timeline: start offset, duration, items in/out, error flag. Complements execution_explain — that one surfaces *why*, this surfaces *when*. Output is a markdown table sorted by start time. Deterministic.",
 		inputSchema: {
 			execution: z
 				.union([z.record(z.unknown()), z.string()])
@@ -274,13 +274,13 @@ maybeRegisterTool(
 	async (input) => timelineExecution(input),
 );
 
-// --- workflow.list ---
+// --- workflow_list ---
 maybeRegisterTool(
-	"workflow.list",
+	"workflow_list",
 	{
 		title: "List workflows on a live n8n instance",
 		description:
-			"List workflows from a live n8n instance (requires N8N_API_URL + N8N_API_KEY env vars). Returns id, name, active, nodeCount, updatedAt, tags. Filter by active, tags, name. Use this when the user asks 'what workflows do I have?' or before workflow.get.",
+			"List workflows from a live n8n instance (requires N8N_API_URL + N8N_API_KEY env vars). Returns id, name, active, nodeCount, updatedAt, tags. Filter by active, tags, name. Use this when the user asks 'what workflows do I have?' or before workflow_get.",
 		inputSchema: {
 			active: z
 				.boolean()
@@ -311,13 +311,13 @@ maybeRegisterTool(
 	async (input) => listWorkflows(input),
 );
 
-// --- workflow.get ---
+// --- workflow_get ---
 maybeRegisterTool(
-	"workflow.get",
+	"workflow_get",
 	{
 		title: "Fetch a single workflow by ID",
 		description:
-			"Fetch a single workflow JSON by id from a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Returns the full nodes/connections payload — pair with workflow.lint to audit a deployed workflow.",
+			"Fetch a single workflow JSON by id from a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Returns the full nodes/connections payload — pair with workflow_lint to audit a deployed workflow.",
 		inputSchema: {
 			id: z.string().min(1).describe("Workflow ID."),
 		},
@@ -333,18 +333,18 @@ maybeRegisterTool(
 	async (input) => getWorkflow(input),
 );
 
-// --- workflow.create ---
+// --- workflow_create ---
 maybeRegisterTool(
-	"workflow.create",
+	"workflow_create",
 	{
 		title: "Create a workflow on a live n8n instance",
 		description:
-			"Create a workflow on a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Strips read-only fields (id, active, createdAt, ...) before posting. Workflows are created inactive — call workflow.activate afterward. Pairs with workflow.generate for end-to-end 'describe -> deploy'.",
+			"Create a workflow on a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Strips read-only fields (id, active, createdAt, ...) before posting. Workflows are created inactive — call workflow_activate afterward. Pairs with workflow_generate for end-to-end 'describe -> deploy'.",
 		inputSchema: {
 			workflow: z
 				.union([z.record(z.unknown()), z.string()])
 				.describe(
-					"Workflow JSON to create (typically the output of workflow.generate). Either a parsed object or a JSON string.",
+					"Workflow JSON to create (typically the output of workflow_generate). Either a parsed object or a JSON string.",
 				),
 		},
 		outputSchema: createWorkflowOutputShape,
@@ -359,9 +359,9 @@ maybeRegisterTool(
 	async (input) => createWorkflow(input),
 );
 
-// --- workflow.activate ---
+// --- workflow_activate ---
 maybeRegisterTool(
-	"workflow.activate",
+	"workflow_activate",
 	{
 		title: "Activate or deactivate a workflow",
 		description:
@@ -385,13 +385,13 @@ maybeRegisterTool(
 	async (input) => activateWorkflow(input),
 );
 
-// --- execution.list ---
+// --- execution_list ---
 maybeRegisterTool(
-	"execution.list",
+	"execution_list",
 	{
 		title: "List recent n8n executions",
 		description:
-			"List recent executions from a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Filter by workflowId, status (success|error|waiting), limit. Pass `includeData: true` to get the full execution body (large) — pair with execution.explain to diagnose a specific failure.",
+			"List recent executions from a live n8n instance (requires N8N_API_URL + N8N_API_KEY). Filter by workflowId, status (success|error|waiting), limit. Pass `includeData: true` to get the full execution body (large) — pair with execution_explain to diagnose a specific failure.",
 		inputSchema: {
 			workflowId: z.string().optional().describe("Filter by workflow ID."),
 			status: z
@@ -409,7 +409,7 @@ maybeRegisterTool(
 				.boolean()
 				.optional()
 				.describe(
-					"Include full execution data (large). Default false — pair with execution.explain.",
+					"Include full execution data (large). Default false — pair with execution_explain.",
 				),
 		},
 		outputSchema: listExecutionsOutputShape,
@@ -425,18 +425,18 @@ maybeRegisterTool(
 );
 
 const ALL_TOOL_NAMES = [
-	"node.scaffold",
-	"workflow.generate",
-	"workflow.lint",
-	"workflow.diff",
-	"execution.explain",
-	"execution.replay",
-	"execution.timeline",
-	"workflow.list",
-	"workflow.get",
-	"workflow.create",
-	"workflow.activate",
-	"execution.list",
+	"node_scaffold",
+	"workflow_generate",
+	"workflow_lint",
+	"workflow_diff",
+	"execution_explain",
+	"execution_replay",
+	"execution_timeline",
+	"workflow_list",
+	"workflow_get",
+	"workflow_create",
+	"workflow_activate",
+	"execution_list",
 ];
 
 async function main() {

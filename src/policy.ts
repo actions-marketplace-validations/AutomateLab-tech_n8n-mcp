@@ -7,19 +7,19 @@
  *                               scaffold). Diagnostic tools still work.
  *   N8N_MCP_DISABLED_TOOLS=...  Comma-separated list of tool names to skip
  *                               registering entirely, e.g.
- *                               "workflow.create,workflow.activate".
+ *                               "workflow_create,workflow_activate".
  *   N8N_MCP_ALLOWED_WORKFLOW_IDS=...  Comma-separated workflow IDs. When
  *                               set, REST tools refuse to touch any
  *                               workflow outside this list.
- *   N8N_MCP_ALLOWED_TAGS=...    Comma-separated tag names. workflow.list
+ *   N8N_MCP_ALLOWED_TAGS=...    Comma-separated tag names. workflow_list
  *                               filters its results to workflows carrying
  *                               at least one of these tags.
  */
 
 const WRITE_TOOLS = new Set<string>([
-	"workflow.create",
-	"workflow.activate",
-	"node.scaffold",
+	"workflow_create",
+	"workflow_activate",
+	"node_scaffold",
 ]);
 
 function parseList(raw: string | undefined): string[] {

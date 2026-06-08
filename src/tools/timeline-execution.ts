@@ -2,7 +2,7 @@ import { z } from "zod";
 
 /**
  * Render an execution as a per-node timeline: start offset, duration,
- * items in/out, error flag. Complements execution.explain — that one
+ * items in/out, error flag. Complements execution_explain — that one
  * surfaces *why* things broke; this one surfaces *when*.
  */
 

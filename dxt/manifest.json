@@ -49,14 +49,14 @@
     "read_only": {
       "type": "string",
       "title": "Read-only mode",
-      "description": "Set to '1' to disable workflow.create, workflow.activate, and node.scaffold.",
+      "description": "Set to '1' to disable workflow_create, workflow_activate, and node_scaffold.",
       "default": "",
       "required": false
     },
     "disabled_tools": {
       "type": "string",
       "title": "Disabled tools (comma-separated)",
-      "description": "e.g. 'workflow.create,workflow.activate' to skip those tools.",
+      "description": "e.g. 'workflow_create,workflow_activate' to skip those tools.",
       "default": "",
       "required": false
     },
@@ -70,24 +70,24 @@
     "allowed_tags": {
       "type": "string",
       "title": "Allowed tags (comma-separated)",
-      "description": "If set, workflow.list filters results to workflows carrying at least one of these tags.",
+      "description": "If set, workflow_list filters results to workflows carrying at least one of these tags.",
       "default": "",
       "required": false
     }
   },
   "tools": [
-    { "name": "workflow.generate", "description": "Generate workflow JSON from plain English." },
-    { "name": "workflow.lint", "description": "Lint a workflow with 20+ rules." },
-    { "name": "workflow.diff", "description": "Semantic diff between two workflows." },
-    { "name": "execution.explain", "description": "Explain why a failed execution misbehaved." },
-    { "name": "execution.replay", "description": "Build a replay workflow isolating one node." },
-    { "name": "execution.timeline", "description": "Render a per-node execution timeline." },
-    { "name": "node.scaffold", "description": "Scaffold a custom node TypeScript skeleton." },
-    { "name": "workflow.list", "description": "List workflows on a live n8n instance." },
-    { "name": "workflow.get", "description": "Fetch a workflow by ID." },
-    { "name": "workflow.create", "description": "Create a workflow on a live n8n instance." },
-    { "name": "workflow.activate", "description": "Activate or deactivate a workflow." },
-    { "name": "execution.list", "description": "List recent executions on a live n8n instance." }
+    { "name": "workflow_generate", "description": "Generate workflow JSON from plain English." },
+    { "name": "workflow_lint", "description": "Lint a workflow with 20+ rules." },
+    { "name": "workflow_diff", "description": "Semantic diff between two workflows." },
+    { "name": "execution_explain", "description": "Explain why a failed execution misbehaved." },
+    { "name": "execution_replay", "description": "Build a replay workflow isolating one node." },
+    { "name": "execution_timeline", "description": "Render a per-node execution timeline." },
+    { "name": "node_scaffold", "description": "Scaffold a custom node TypeScript skeleton." },
+    { "name": "workflow_list", "description": "List workflows on a live n8n instance." },
+    { "name": "workflow_get", "description": "Fetch a workflow by ID." },
+    { "name": "workflow_create", "description": "Create a workflow on a live n8n instance." },
+    { "name": "workflow_activate", "description": "Activate or deactivate a workflow." },
+    { "name": "execution_list", "description": "List recent executions on a live n8n instance." }
   ],
   "compatibility": {
     "claude_desktop": ">=0.10.0",

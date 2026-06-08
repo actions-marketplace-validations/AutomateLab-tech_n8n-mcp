@@ -99,7 +99,7 @@ function errorResult(error: string) {
 }
 
 // ---------------------------------------------------------------------------
-// workflow.list
+// workflow_list
 // ---------------------------------------------------------------------------
 
 export const listWorkflowsInputSchema = {
@@ -171,7 +171,7 @@ export async function listWorkflows(rawArgs: unknown) {
 }
 
 // ---------------------------------------------------------------------------
-// workflow.get
+// workflow_get
 // ---------------------------------------------------------------------------
 
 export const getWorkflowInputSchema = {
@@ -197,7 +197,7 @@ export async function getWorkflow(rawArgs: unknown) {
 }
 
 // ---------------------------------------------------------------------------
-// workflow.create
+// workflow_create
 // ---------------------------------------------------------------------------
 
 export const createWorkflowInputSchema = {
@@ -205,7 +205,7 @@ export const createWorkflowInputSchema = {
 	properties: {
 		workflow: {
 			description:
-				"Workflow JSON to create (typically the output of workflow.generate). Either a parsed object or a JSON string.",
+				"Workflow JSON to create (typically the output of workflow_generate). Either a parsed object or a JSON string.",
 			oneOf: [{ type: "object" }, { type: "string" }],
 		},
 	},
@@ -221,7 +221,7 @@ export async function createWorkflow(rawArgs: unknown) {
 	if ("error" in cfg) return errorResult(cfg.error);
 	if (getAllowedWorkflowIds()) {
 		return errorResult(
-			"workflow.create is disabled when N8N_MCP_ALLOWED_WORKFLOW_IDS is set: a brand-new workflow's id cannot be in the allowlist by definition. Unset the env var or create the workflow in the n8n UI first, then add its id to the allowlist.",
+			"workflow_create is disabled when N8N_MCP_ALLOWED_WORKFLOW_IDS is set: a brand-new workflow's id cannot be in the allowlist by definition. Unset the env var or create the workflow in the n8n UI first, then add its id to the allowlist.",
 		);
 	}
 	const args = createWorkflowZod.parse(rawArgs);
@@ -239,13 +239,13 @@ export async function createWorkflow(rawArgs: unknown) {
 	const id = "id" in created ? String(created.id) : "";
 	const name = (created.name as string) ?? "(unnamed)";
 	const msg = id
-		? `Created workflow "${name}" with id ${id}. Activate it with workflow.activate.`
+		? `Created workflow "${name}" with id ${id}. Activate it with workflow_activate.`
 		: `Workflow create returned no id. Raw response: ${JSON.stringify(r.data).slice(0, 200)}`;
 	return textResult(msg, { id, name, workflow: created });
 }
 
 // ---------------------------------------------------------------------------
-// workflow.activate
+// workflow_activate
 // ---------------------------------------------------------------------------
 
 export const activateWorkflowInputSchema = {
@@ -287,7 +287,7 @@ export async function activateWorkflow(rawArgs: unknown) {
 }
 
 // ---------------------------------------------------------------------------
-// execution.list
+// execution_list
 // ---------------------------------------------------------------------------
 
 export const listExecutionsInputSchema = {
@@ -306,7 +306,7 @@ export const listExecutionsInputSchema = {
 		includeData: {
 			type: "boolean",
 			description:
-				"Include full execution data (large). Default false — pair with execution.explain.",
+				"Include full execution data (large). Default false — pair with execution_explain.",
 		},
 	},
 } as const;

@@ -9,9 +9,9 @@ configSchema:
       title: n8n instance URL
       description: >
         Base URL of your n8n instance (e.g. https://my-n8n.example.com).
-        Required only for live tools (workflow.list, workflow.get, workflow.create,
-        workflow.activate, execution.*). Offline tools (workflow.generate,
-        workflow.lint, node.scaffold, execution.explain) work without it.
+        Required only for live tools (workflow_list, workflow_get, workflow_create,
+        workflow_activate, execution.*). Offline tools (workflow_generate,
+        workflow_lint, node_scaffold, execution_explain) work without it.
     n8nApiKey:
       type: string
       title: n8n API key
@@ -20,7 +20,7 @@ configSchema:
       type: boolean
       title: Read-only mode
       description: >
-        If true, disables all write tools (workflow.create, workflow.activate).
+        If true, disables all write tools (workflow_create, workflow_activate).
         Useful for read-and-analyse workflows.
   required: []
 
